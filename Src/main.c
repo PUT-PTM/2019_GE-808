@@ -44,7 +44,6 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "MY_CS43L22.h"
-
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -54,7 +53,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define F_SAMPLE 	50000.0f
+#define F_OUT 		500.0f
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -63,31 +63,58 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+ADC_HandleTypeDef hadc1;
+
 I2C_HandleTypeDef hi2c1;
 
 I2S_HandleTypeDef hi2s3;
 DMA_HandleTypeDef hdma_spi3_tx;
 
+TIM_HandleTypeDef htim2;
+
 /* USER CODE BEGIN PV */
+uint16_t value=0;
+float mySinVal;
+float sample_dt;
+uint16_t sample_N;
+uint16_t i=0;
 
-extern const uint8_t rawData2[44938];
-extern const uint8_t rawAudio[123200];
-
-int bool=0;
-
+int16_t dataI2S[100];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
-static void MX_I2S3_Init(void);
 static void MX_I2C1_Init(void);
+static void MX_I2S3_Init(void);
+static void MX_ADC1_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
-void HAL_I2S_TxCpltCallback(I2S_HandleTypeDef *hi2s){
-	bool++;
-	if(bool==3) bool=0;
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
+
+	if(htim->Instance==TIM2){
+		if(HAL_ADC_PollForConversion(&hadc1, 10) == HAL_OK){
+
+		 value = HAL_ADC_GetValue(&hadc1);
+
+		 //OVERDRIVE
+		 /*if(value>2200) value=2200;
+		 if(value<1500) value=1500;*/
+
+		 dataI2S[i*2] = (value);    //Right data (0 2 4 6 8 10 12)
+		 dataI2S[i*2 + 1] =(value); //Left data  (1 3 5 7 9 11 13)
+		 i++;
+		 if(i==100) i=0;
+		 HAL_ADC_Start(&hadc1);
+		}
+	}
+
+
 }
+/*void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc){
+	value = HAL_ADC_GetValue(&hadc1);
+}*/
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -102,7 +129,7 @@ void HAL_I2S_TxCpltCallback(I2S_HandleTypeDef *hi2s){
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-
+	sample_N = F_SAMPLE/F_OUT;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -124,67 +151,30 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_DMA_Init();
-  MX_I2S3_Init();
   MX_I2C1_Init();
+  MX_I2S3_Init();
+  MX_ADC1_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
-	CS43_Init(hi2c1, MODE_I2S);
-	CS43_SetVolume(50); //0 - 100,, 40
-	CS43_Enable_RightLeft(CS43_RIGHT_LEFT);
-	CS43_Start();
-		uint16_t rick1[61600];
-		uint16_t rick2[61600];
-		uint16_t rick3[61600];
-		uint16_t rick4[61600];
-
-	for(uint16_t i=0;i<30800;i++){
-
-			rick1[i*2]=rawAudio[i];
-			rick1[i*2 + 1]=rawAudio[i];
-
-			rick2[i*2]=rawAudio[i+30800];
-			rick2[i*2 + 1]=rawAudio[i+30800];
-
-			rick3[i*2]=rawAudio[i+61600];
-			rick3[i*2 + 1]=rawAudio[i+61600];
-
-			rick4[i*2]=rawAudio[i+92400];
-			rick4[i*2 + 1]=rawAudio[i];
-
-	}
-
-  HAL_I2S_Transmit_DMA(&hi2s3, (uint16_t *)rick1, 61600);
-  //HAL_I2S_Transmit_DMA(&hi2s3, (uint16_t *)rick2, 61600);
-  //HAL_I2S_Transmit_DMA(&hi2s3, (uint16_t *)rick3, 61600);
-  //HAL_I2S_Transmit_DMA(&hi2s3, (uint16_t *)rick4, 61600);
 
 
+  CS43_Init(hi2c1, MODE_I2S);
+  CS43_SetVolume(100);
+  CS43_Enable_RightLeft(CS43_RIGHT_LEFT);
+
+  HAL_ADC_Start(&hadc1);
+  HAL_TIM_Base_Start_IT(&htim2);
+  CS43_Start();
+
+	HAL_I2S_Transmit_DMA(&hi2s3, (uint16_t *)dataI2S, 194);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  if(bool==0){
-		  for(uint16_t i=0;i<30800;i++){
-		  		rick1[i*2]=rawAudio[i];
-		  		rick1[i*2 + 1]=rawAudio[i];
-		  	}
-	  }else if(bool==1){
-		  for(uint16_t i=0;i<30800;i++){
-		  		rick1[i*2]=rawAudio[i+30800];
-		  		rick1[i*2 + 1]=rawAudio[i+30800];
-		  	}
-	  }else if(bool==2){
-		  for(uint16_t i=0;i<30800;i++){
-				rick1[i*2]=rawAudio[i+61600];
-				rick1[i*2 + 1]=rawAudio[i+61600];
-		 	}
-	  }else if(bool==3){
-		  for(uint16_t i=0;i<30800;i++){
-				rick1[i*2]=rawAudio[i+92400];
-				rick1[i*2 + 1]=rawAudio[i];
-		 	}
-	  }
+
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -234,12 +224,62 @@ void SystemClock_Config(void)
     Error_Handler();
   }
   PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_I2S;
-  PeriphClkInitStruct.PLLI2S.PLLI2SN = 50;
+  PeriphClkInitStruct.PLLI2S.PLLI2SN = 192;
   PeriphClkInitStruct.PLLI2S.PLLI2SR = 2;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
+
+  /* USER CODE BEGIN ADC1_Init 0 */
+
+  /* USER CODE END ADC1_Init 0 */
+
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC1_Init 1 */
+
+  /* USER CODE END ADC1_Init 1 */
+  /**Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion) 
+  */
+  hadc1.Instance = ADC1;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
+  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
+  hadc1.Init.ScanConvMode = DISABLE;
+  hadc1.Init.ContinuousConvMode = DISABLE;
+  hadc1.Init.DiscontinuousConvMode = DISABLE;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc1.Init.NbrOfConversion = 1;
+  hadc1.Init.DMAContinuousRequests = DISABLE;
+  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /**Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time. 
+  */
+  sConfig.Channel = ADC_CHANNEL_13;
+  sConfig.Rank = 1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC1_Init 2 */
+
+  /* USER CODE END ADC1_Init 2 */
+
 }
 
 /**
@@ -296,7 +336,7 @@ static void MX_I2S3_Init(void)
   hi2s3.Init.Standard = I2S_STANDARD_PHILIPS;
   hi2s3.Init.DataFormat = I2S_DATAFORMAT_16B;
   hi2s3.Init.MCLKOutput = I2S_MCLKOUTPUT_ENABLE;
-  hi2s3.Init.AudioFreq = I2S_AUDIOFREQ_16K;
+  hi2s3.Init.AudioFreq = I2S_AUDIOFREQ_48K;
   hi2s3.Init.CPOL = I2S_CPOL_LOW;
   hi2s3.Init.ClockSource = I2S_CLOCK_PLL;
   hi2s3.Init.FullDuplexMode = I2S_FULLDUPLEXMODE_DISABLE;
@@ -307,6 +347,50 @@ static void MX_I2S3_Init(void)
   /* USER CODE BEGIN I2S3_Init 2 */
 
   /* USER CODE END I2S3_Init 2 */
+
+}
+
+/**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 49;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 34;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
 
 }
 
@@ -336,19 +420,16 @@ static void MX_GPIO_Init(void)
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOH_CLK_ENABLE();
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
-  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12|GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_15 
-                          |GPIO_PIN_4, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : PD12 PD13 PD14 PD15 
-                           PD4 */
-  GPIO_InitStruct.Pin = GPIO_PIN_12|GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_15 
-                          |GPIO_PIN_4;
+  /*Configure GPIO pin : PD4 */
+  GPIO_InitStruct.Pin = GPIO_PIN_4;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
