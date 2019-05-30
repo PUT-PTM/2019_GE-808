@@ -40,10 +40,10 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "MY_CS43L22.h"
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "MY_CS43L22.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -53,7 +53,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define F_SAMPLE 	50000.0f
+#define F_OUT 		500.0f
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -63,7 +64,6 @@
 
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
-DMA_HandleTypeDef hdma_adc1;
 
 I2C_HandleTypeDef hi2c1;
 
@@ -73,33 +73,48 @@ DMA_HandleTypeDef hdma_spi3_tx;
 TIM_HandleTypeDef htim2;
 
 /* USER CODE BEGIN PV */
-#define 	I2S_STEREO_DOUBLE_BUF 	470
-#define 	BUFFER_SIZE 			256
-#define 	HALF_BUFFER_SIZE 		128
+uint16_t value=0;
+float mySinVal;
+float sample_dt;
+uint16_t sample_N;
+uint16_t i=0;
 
-uint16_t testval,testvalout;
-
-uint16_t adc_val[BUFFER_SIZE]; //data type conflict TODO ... napisa³em na pa³ê 32, zobaczê co siê stanie
-uint16_t dataI2S[I2S_STEREO_DOUBLE_BUF]; //what happens if i will use uint?
-
-static volatile uint16_t *inbufPtr;
-static volatile uint16_t *outbufPtr;
-
+int16_t dataI2S[100];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
-static void MX_ADC1_Init(void);
-static void MX_TIM2_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_I2S3_Init(void);
-void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef* hadc);
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc);
-void process_func();
+static void MX_ADC1_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 
+	if(htim->Instance==TIM2){
+		if(HAL_ADC_PollForConversion(&hadc1, 10) == HAL_OK){
+
+		 value = HAL_ADC_GetValue(&hadc1);
+
+		 //OVERDRIVE
+		 /*if(value>2200) value=2200;
+		 if(value<1500) value=1500;*/
+
+		 dataI2S[i*2] = (value);    //Right data (0 2 4 6 8 10 12)
+		 dataI2S[i*2 + 1] =(value); //Left data  (1 3 5 7 9 11 13)
+		 i++;
+		 if(i==100) i=0;
+		 HAL_ADC_Start(&hadc1);
+		}
+	}
+
+
+}
+/*void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc){
+	value = HAL_ADC_GetValue(&hadc1);
+}*/
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -114,7 +129,7 @@ void process_func();
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-
+	sample_N = F_SAMPLE/F_OUT;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -136,32 +151,32 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_DMA_Init();
-  MX_ADC1_Init();
-  MX_TIM2_Init();
   MX_I2C1_Init();
   MX_I2S3_Init();
+  MX_ADC1_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 
-  CS43_Init(hi2c1,MODE_I2S);
-  CS43_SetVolume(40);
+
+  CS43_Init(hi2c1, MODE_I2S);
+  CS43_SetVolume(100);
   CS43_Enable_RightLeft(CS43_RIGHT_LEFT);
 
-
-  HAL_TIM_Base_Start(&htim2);
-
+  HAL_ADC_Start(&hadc1);
+  HAL_TIM_Base_Start_IT(&htim2);
   CS43_Start();
 
-  HAL_ADC_Start_DMA(&hadc1,(uint16_t *)adc_val,BUFFER_SIZE);
-
-  HAL_I2S_Transmit_DMA(&hi2s3,(uint16_t *)dataI2S,I2S_STEREO_DOUBLE_BUF);
+	HAL_I2S_Transmit_DMA(&hi2s3, (uint16_t *)dataI2S, 194);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+
+
     /* USER CODE END WHILE */
-	  process_func();
+
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
@@ -209,7 +224,7 @@ void SystemClock_Config(void)
     Error_Handler();
   }
   PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_I2S;
-  PeriphClkInitStruct.PLLI2S.PLLI2SN = 50;
+  PeriphClkInitStruct.PLLI2S.PLLI2SN = 192;
   PeriphClkInitStruct.PLLI2S.PLLI2SR = 2;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
   {
@@ -242,11 +257,11 @@ static void MX_ADC1_Init(void)
   hadc1.Init.ScanConvMode = DISABLE;
   hadc1.Init.ContinuousConvMode = DISABLE;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
-  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_RISING;
-  hadc1.Init.ExternalTrigConv = ADC_EXTERNALTRIGCONV_T2_TRGO;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
   hadc1.Init.NbrOfConversion = 1;
-  hadc1.Init.DMAContinuousRequests = ENABLE;
+  hadc1.Init.DMAContinuousRequests = DISABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   if (HAL_ADC_Init(&hadc1) != HAL_OK)
   {
@@ -367,7 +382,7 @@ static void MX_TIM2_Init(void)
   {
     Error_Handler();
   }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_UPDATE;
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
   if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
   {
@@ -386,15 +401,11 @@ static void MX_DMA_Init(void)
 {
   /* DMA controller clock enable */
   __HAL_RCC_DMA1_CLK_ENABLE();
-  __HAL_RCC_DMA2_CLK_ENABLE();
 
   /* DMA interrupt init */
   /* DMA1_Stream5_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
-  /* DMA2_Stream0_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
 
 }
 
@@ -415,10 +426,10 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12|GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_15, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : PD12 PD13 PD14 PD15 */
-  GPIO_InitStruct.Pin = GPIO_PIN_12|GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_15;
+  /*Configure GPIO pin : PD4 */
+  GPIO_InitStruct.Pin = GPIO_PIN_4;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -427,47 +438,6 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef* hadc)
-{
-	//when first half is full, i want to grab the first half into the processing function
-	//and then the data should be inserted into the second half of the output function, cause the first one is being emptied rn
-	 inbufPtr=&adc_val[0];
-	 outbufPtr=&dataI2S[BUFFER_SIZE]; //bo BUFFER_SIZE to po³owa I2S_STEREO_DOUBLE_BUF
-
-}
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
-{
-	 inbufPtr=&adc_val[HALF_BUFFER_SIZE];
-	 outbufPtr=&dataI2S[0];
-}
-
-void process_func()
-{
-	for (int n=0;n<BUFFER_SIZE;n++)
-	{
-		if (inbufPtr[n]>3000)
-		{
-			HAL_GPIO_WritePin(GPIOD,GPIO_PIN_15,1);
-		}
-		if (inbufPtr[n]<100)
-		{
-			HAL_GPIO_TogglePin(GPIOD,GPIO_PIN_14);
-			HAL_GPIO_WritePin(GPIOD,GPIO_PIN_15,0);
-		}
-		if(inbufPtr[1]>2000)
-		{
-			HAL_GPIO_WritePin(GPIOD,GPIO_PIN_13,SET);
-		}
-		else
-			HAL_GPIO_WritePin(GPIOD,GPIO_PIN_13,RESET);
-		testval=inbufPtr[0];
-		outbufPtr[n]=inbufPtr[n];
-		outbufPtr[n*2+1]=inbufPtr[n];
-		testvalout=outbufPtr[0];
-		//pointer to output buffer[n]=pointer to input buffer[n]
-		//output buffer is bigger than input, bcs of i2s stereo stuff
-	}
-}
 
 /* USER CODE END 4 */
 
