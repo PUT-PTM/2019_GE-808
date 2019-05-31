@@ -53,8 +53,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define F_SAMPLE 	50000.0f
-#define F_OUT 		500.0f
+#define SAMPLE 1
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -64,6 +63,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
+DMA_HandleTypeDef hdma_adc1;
 
 I2C_HandleTypeDef hi2c1;
 
@@ -74,12 +74,12 @@ TIM_HandleTypeDef htim2;
 
 /* USER CODE BEGIN PV */
 uint16_t value=0;
-float mySinVal;
-float sample_dt;
-uint16_t sample_N;
-uint16_t i=0;
 
-int16_t dataI2S[100];
+uint16_t dataI2S[SAMPLE];
+uint16_t dataADC[SAMPLE];
+uint16_t echo_data[15000];
+int i=0;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -91,30 +91,72 @@ static void MX_I2S3_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
+
+
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 
 	if(htim->Instance==TIM2){
 		if(HAL_ADC_PollForConversion(&hadc1, 10) == HAL_OK){
 
-		 value = HAL_ADC_GetValue(&hadc1);
+		 //value = HAL_ADC_GetValue(&hadc1);
 
-		 //OVERDRIVE
-		 /*if(value>2200) value=2200;
-		 if(value<1500) value=1500;*/
 
-		 dataI2S[i*2] = (value);    //Right data (0 2 4 6 8 10 12)
-		 dataI2S[i*2 + 1] =(value); //Left data  (1 3 5 7 9 11 13)
-		 i++;
-		 if(i==100) i=0;
-		 HAL_ADC_Start(&hadc1);
+
+
+		 //dataI2S[0] = (value);
+
+		 //HAL_ADC_Start(&hadc1);
+
+			//HAL_ADC_Start_DMA(&hadc1, dataI2S, 1);
+
+
+
+			//OVERDRIVE
+
+			//if(dataI2S[0]>2000) dataI2S[0]=2000;
+			//if(dataI2S[0]<1000) dataI2S[0]=1000;
+
+
+		/*	echo_data[i]=dataI2S[0];
+			if(i>5000) dataI2S[0]+=echo_data[i-5000];
+			i++;
+			if(i==15000) i=0;*/
 		}
 	}
 
 
 }
-/*void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc){
-	value = HAL_ADC_GetValue(&hadc1);
-}*/
+
+
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) {
+	HAL_ADC_Stop_DMA(&hadc1);
+
+	//OVERDRIVE
+//	dataI2S[0]=dataADC[0];
+//	if(dataI2S[0]>2000) dataI2S[0]=2000;
+//	if(dataI2S[0]<1250) dataI2S[0]=1250;
+
+	//LEPSZY OVERDRIVE
+//	if(dataADC[0]>1690){
+//		dataI2S[0]=dataADC[0]*1.5;
+//	}else if(dataADC[0]<1660){
+//		dataI2S[0]=dataADC[0]*0.5;
+//	}else{
+//		dataI2S[0]=dataADC[0];
+//	}
+
+
+
+
+	//CLEAN
+//	dataI2S[0]=dataADC[0];
+
+
+	HAL_I2S_Transmit_DMA(&hi2s3, (uint16_t *)dataI2S, SAMPLE);
+	HAL_ADC_Start_DMA(&hadc1, dataADC, SAMPLE);
+}
+
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -129,7 +171,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-	sample_N = F_SAMPLE/F_OUT;
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -161,12 +203,19 @@ int main(void)
   CS43_Init(hi2c1, MODE_I2S);
   CS43_SetVolume(100);
   CS43_Enable_RightLeft(CS43_RIGHT_LEFT);
-
-  HAL_ADC_Start(&hadc1);
-  HAL_TIM_Base_Start_IT(&htim2);
   CS43_Start();
 
-	HAL_I2S_Transmit_DMA(&hi2s3, (uint16_t *)dataI2S, 194);
+  HAL_ADC_Start(&hadc1);
+  HAL_ADC_Start_IT(&hadc1);
+
+  HAL_TIM_Base_Start_IT(&htim2);
+
+
+  HAL_ADC_Start_DMA(&hadc1, dataADC, SAMPLE);
+
+
+
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -252,16 +301,16 @@ static void MX_ADC1_Init(void)
   /**Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion) 
   */
   hadc1.Instance = ADC1;
-  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV8;
   hadc1.Init.Resolution = ADC_RESOLUTION_12B;
-  hadc1.Init.ScanConvMode = DISABLE;
-  hadc1.Init.ContinuousConvMode = DISABLE;
+  hadc1.Init.ScanConvMode = ENABLE;
+  hadc1.Init.ContinuousConvMode = ENABLE;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
   hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
   hadc1.Init.NbrOfConversion = 1;
-  hadc1.Init.DMAContinuousRequests = DISABLE;
+  hadc1.Init.DMAContinuousRequests = ENABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   if (HAL_ADC_Init(&hadc1) != HAL_OK)
   {
@@ -401,11 +450,15 @@ static void MX_DMA_Init(void)
 {
   /* DMA controller clock enable */
   __HAL_RCC_DMA1_CLK_ENABLE();
+  __HAL_RCC_DMA2_CLK_ENABLE();
 
   /* DMA interrupt init */
   /* DMA1_Stream5_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
+  /* DMA2_Stream0_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
 
 }
 
