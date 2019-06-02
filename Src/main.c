@@ -44,6 +44,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "MY_CS43L22.h"
+#include "math.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -54,6 +55,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define SAMPLE 1
+#define PI 3.14159
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -77,9 +79,12 @@ uint16_t value=0;
 
 uint16_t dataI2S[SAMPLE];
 uint16_t dataADC[SAMPLE];
-uint16_t echo_data[15000];
-int i=0;
+uint16_t echo[SAMPLE];
 
+int j=0;
+int echo_it=0;
+
+uint32_t echo_buff[15000]={0};
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -100,19 +105,13 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 
 		 //value = HAL_ADC_GetValue(&hadc1);
 
-
-
-
 		 //dataI2S[0] = (value);
 
 		 //HAL_ADC_Start(&hadc1);
 
 			//HAL_ADC_Start_DMA(&hadc1, dataI2S, 1);
 
-
-
 			//OVERDRIVE
-
 			//if(dataI2S[0]>2000) dataI2S[0]=2000;
 			//if(dataI2S[0]<1000) dataI2S[0]=1000;
 
@@ -137,19 +136,42 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) {
 //	if(dataI2S[0]<1250) dataI2S[0]=1250;
 
 	//LEPSZY OVERDRIVE
-//	if(dataADC[0]>1690){
-//		dataI2S[0]=dataADC[0]*1.5;
-//	}else if(dataADC[0]<1660){
-//		dataI2S[0]=dataADC[0]*0.5;
+//	if(dataADC[0]>1695){
+//		dataI2S[0]=(uint16_t)(dataADC[0]*1.5);
+//	}else if(dataADC[0]<1655){
+//		dataI2S[0]=(uint16_t)(dataADC[0]*0.5);
 //	}else{
 //		dataI2S[0]=dataADC[0];
 //	}
 
+	//TREMOLO
+//	dataI2S[0] = dataADC[0] * 0.7 * sin(2*PI*j/1300)+1750;
+//	j++;
+//	if(j==1300) j=0;
 
+
+	//ECHO
+//	if (echo_it < 5000) {
+//		echo_buff[echo_it] = dataADC[0];
+//	} else if (echo_it < 10000) {
+//	    dataADC[0] += echo_buff[echo_it - 5000] * 0.7;
+//	    echo_buff[echo_it] = dataADC[0];
+//	} else if (echo_it <= 14999) {
+//	    dataADC[0] += echo_buff[echo_it - 5000] * 0.7;
+//	    echo_buff[echo_it-10000] = dataADC[0];
+//	}
+//
+//	dataADC[0] = dataADC[0]/2;
+//
+//	if (echo_it >= 14999){
+//	    echo_it = 5000;
+//	} else {
+//	    echo_it++;
+//	}
 
 
 	//CLEAN
-//	dataI2S[0]=dataADC[0];
+	dataI2S[0]=dataADC[0];
 
 
 	HAL_I2S_Transmit_DMA(&hi2s3, (uint16_t *)dataI2S, SAMPLE);
@@ -201,7 +223,7 @@ int main(void)
 
 
   CS43_Init(hi2c1, MODE_I2S);
-  CS43_SetVolume(100);
+  CS43_SetVolume(90);
   CS43_Enable_RightLeft(CS43_RIGHT_LEFT);
   CS43_Start();
 
@@ -214,6 +236,10 @@ int main(void)
   HAL_ADC_Start_DMA(&hadc1, dataADC, SAMPLE);
 
 
+  //Jakieœ dzikie brzmienia ( sample na 1000)
+//  HAL_I2S_DeInit(&hi2s3);
+//  hi2s3.Init.AudioFreq = I2S_AUDIOFREQ_16K;
+//  HAL_I2S_Init(&hi2s3);
 
 
   /* USER CODE END 2 */
