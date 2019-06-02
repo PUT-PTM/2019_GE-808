@@ -84,6 +84,10 @@ uint16_t echo[SAMPLE];
 int j=0;
 int echo_it=0;
 
+int echo_effect=0;
+int dist_effect=0;
+int tremolo_effect=0;
+
 uint32_t echo_buff[15000]={0};
 /* USER CODE END PV */
 
@@ -96,82 +100,98 @@ static void MX_I2S3_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
-
-
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
-
-	if(htim->Instance==TIM2){
-		if(HAL_ADC_PollForConversion(&hadc1, 10) == HAL_OK){
-
-		 //value = HAL_ADC_GetValue(&hadc1);
-
-		 //dataI2S[0] = (value);
-
-		 //HAL_ADC_Start(&hadc1);
-
-			//HAL_ADC_Start_DMA(&hadc1, dataI2S, 1);
-
-			//OVERDRIVE
-			//if(dataI2S[0]>2000) dataI2S[0]=2000;
-			//if(dataI2S[0]<1000) dataI2S[0]=1000;
-
-
-		/*	echo_data[i]=dataI2S[0];
-			if(i>5000) dataI2S[0]+=echo_data[i-5000];
-			i++;
-			if(i==15000) i=0;*/
-		}
+void ECHO(uint16_t *dataADC){
+	if (echo_it < 5000) {
+		echo_buff[echo_it] = dataADC[0];
+	} else if (echo_it < 10000) {
+	    dataADC[0] += echo_buff[echo_it - 5000] * 0.7;
+	    echo_buff[echo_it] = dataADC[0];
+	} else if (echo_it <= 14999) {
+	    dataADC[0] += echo_buff[echo_it - 5000] * 0.7;
+	    echo_buff[echo_it-10000] = dataADC[0];
 	}
 
+	dataADC[0] = dataADC[0]/2;
 
+	if (echo_it >= 14999){
+	    echo_it = 5000;
+	} else {
+	    echo_it++;
+	}
+}
+
+void TREMOLO(uint16_t *dataADC){
+	dataI2S[0] = dataADC[0] * 0.7 * sin(2*PI*j/1300)+1750;
+	j++;
+	if(j==1300) j=0;
+
+}
+
+void DIST(uint16_t *dataADC){
+	if(dataADC[0]>1800){
+		dataI2S[0]=(uint16_t)(dataADC[0]*1.2);
+	}else if(dataADC[0]<1555){
+		dataI2S[0]=(uint16_t)(dataADC[0]*0.8);
+	}else{
+		dataI2S[0]=dataADC[0];
+	}
+}
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
+	if(htim->Instance==TIM2){
+		if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_1)==GPIO_PIN_RESET){
+			HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);
+			HAL_TIM_Base_Stop_IT(&htim2);
+			if(echo_effect==0){
+				echo_effect=1;
+			}else{
+				echo_effect=0;
+			}
+		}else if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_3)==GPIO_PIN_RESET){
+			HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_13);
+			HAL_TIM_Base_Stop_IT(&htim2);
+			if(dist_effect==0){
+				dist_effect=1;
+			}else{
+				dist_effect=0;
+			}
+		}else if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_5)==GPIO_PIN_RESET){
+			HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_14);
+			HAL_TIM_Base_Stop_IT(&htim2);
+			if(tremolo_effect==0){
+				tremolo_effect=1;
+			}else{
+				tremolo_effect=0;
+			}
+		}else if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_7)==GPIO_PIN_RESET){
+			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12,0);
+			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13,0);
+			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14,0);
+			tremolo_effect=0;
+			dist_effect=0;
+			echo_effect=0;
+			HAL_TIM_Base_Stop_IT(&htim2);
+		}
+	}
+}
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
+ 	 HAL_TIM_Base_Start_IT(&htim2);
 }
 
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) {
 	HAL_ADC_Stop_DMA(&hadc1);
 
-	//OVERDRIVE
-//	dataI2S[0]=dataADC[0];
-//	if(dataI2S[0]>2000) dataI2S[0]=2000;
-//	if(dataI2S[0]<1250) dataI2S[0]=1250;
-
-	//LEPSZY OVERDRIVE
-//	if(dataADC[0]>1695){
-//		dataI2S[0]=(uint16_t)(dataADC[0]*1.5);
-//	}else if(dataADC[0]<1655){
-//		dataI2S[0]=(uint16_t)(dataADC[0]*0.5);
-//	}else{
-//		dataI2S[0]=dataADC[0];
-//	}
-
-	//TREMOLO
-//	dataI2S[0] = dataADC[0] * 0.7 * sin(2*PI*j/1300)+1750;
-//	j++;
-//	if(j==1300) j=0;
-
-
-	//ECHO
-//	if (echo_it < 5000) {
-//		echo_buff[echo_it] = dataADC[0];
-//	} else if (echo_it < 10000) {
-//	    dataADC[0] += echo_buff[echo_it - 5000] * 0.7;
-//	    echo_buff[echo_it] = dataADC[0];
-//	} else if (echo_it <= 14999) {
-//	    dataADC[0] += echo_buff[echo_it - 5000] * 0.7;
-//	    echo_buff[echo_it-10000] = dataADC[0];
-//	}
-//
-//	dataADC[0] = dataADC[0]/2;
-//
-//	if (echo_it >= 14999){
-//	    echo_it = 5000;
-//	} else {
-//	    echo_it++;
-//	}
-
-
-	//CLEAN
-	dataI2S[0]=dataADC[0];
+	if(echo_effect==1) {
+		ECHO(dataADC);
+		dataI2S[0]=dataADC[0];
+	}else if(dist_effect==1) {
+		TREMOLO(dataADC);
+	}else if(tremolo_effect==1){
+		DIST(dataADC);
+	}else{
+		dataI2S[0]=dataADC[0];
+	}
 
 
 	HAL_I2S_Transmit_DMA(&hi2s3, (uint16_t *)dataI2S, SAMPLE);
@@ -230,7 +250,6 @@ int main(void)
   HAL_ADC_Start(&hadc1);
   HAL_ADC_Start_IT(&hadc1);
 
-  HAL_TIM_Base_Start_IT(&htim2);
 
 
   HAL_ADC_Start_DMA(&hadc1, dataADC, SAMPLE);
@@ -444,9 +463,9 @@ static void MX_TIM2_Init(void)
 
   /* USER CODE END TIM2_Init 1 */
   htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 49;
+  htim2.Init.Prescaler = 8399;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 34;
+  htim2.Init.Period = 699;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
   {
@@ -505,14 +524,30 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12|GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_4, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : PD4 */
-  GPIO_InitStruct.Pin = GPIO_PIN_4;
+  /*Configure GPIO pins : PA1 PA3 PA5 PA7 */
+  GPIO_InitStruct.Pin = GPIO_PIN_1|GPIO_PIN_3|GPIO_PIN_5|GPIO_PIN_7;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PD12 PD13 PD14 PD4 */
+  GPIO_InitStruct.Pin = GPIO_PIN_12|GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_4;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI1_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI1_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI3_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI3_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
 }
 
