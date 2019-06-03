@@ -118,6 +118,7 @@ void ECHO(uint16_t *dataADC){
 	} else {
 	    echo_it++;
 	}
+	dataI2S[0]=dataADC[0];
 }
 
 void TREMOLO(uint16_t *dataADC){
@@ -140,36 +141,63 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	if(htim->Instance==TIM2){
 		if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_1)==GPIO_PIN_RESET){
 			HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);
+			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, 0);
+			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, 0);
+			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, 0);
 			HAL_TIM_Base_Stop_IT(&htim2);
+
 			if(echo_effect==0){
 				echo_effect=1;
+				dist_effect=0;
+				tremolo_effect=0;
 			}else{
 				echo_effect=0;
+				HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, 1);
 			}
 		}else if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_3)==GPIO_PIN_RESET){
-			HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_13);
-			HAL_TIM_Base_Stop_IT(&htim2);
-			if(dist_effect==0){
-				dist_effect=1;
-			}else{
-				dist_effect=0;
-			}
-		}else if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_5)==GPIO_PIN_RESET){
+
 			HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_14);
+			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, 0);
+			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, 0);
+			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, 0);
 			HAL_TIM_Base_Stop_IT(&htim2);
 			if(tremolo_effect==0){
 				tremolo_effect=1;
+				dist_effect=0;
+				echo_effect=0;
 			}else{
 				tremolo_effect=0;
+				HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, 1);
 			}
-		}else if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_7)==GPIO_PIN_RESET){
-			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12,0);
-			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13,0);
-			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14,0);
+		}else if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_5)==GPIO_PIN_RESET){
+			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, 1);
+			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, 0);
+			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, 0);
+			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, 0);
+
+			HAL_TIM_Base_Stop_IT(&htim2);
 			tremolo_effect=0;
 			dist_effect=0;
 			echo_effect=0;
+
+
+		}else if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_7)==GPIO_PIN_RESET){
+			HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_15);
+			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, 0);
+			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, 0);
+			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, 0);
 			HAL_TIM_Base_Stop_IT(&htim2);
+
+
+			if(dist_effect==0){
+				dist_effect=1;
+				tremolo_effect=0;
+				echo_effect=0;
+			}else{
+				dist_effect=0;
+				HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, 1);
+			}
+
 		}
 	}
 }
@@ -184,11 +212,10 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) {
 
 	if(echo_effect==1) {
 		ECHO(dataADC);
-		dataI2S[0]=dataADC[0];
 	}else if(dist_effect==1) {
-		TREMOLO(dataADC);
-	}else if(tremolo_effect==1){
 		DIST(dataADC);
+	}else if(tremolo_effect==1){
+		TREMOLO(dataADC);
 	}else{
 		dataI2S[0]=dataADC[0];
 	}
@@ -254,6 +281,7 @@ int main(void)
 
   HAL_ADC_Start_DMA(&hadc1, dataADC, SAMPLE);
 
+  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, 1);
 
   //Jakieœ dzikie brzmienia ( sample na 1000)
 //  HAL_I2S_DeInit(&hi2s3);
@@ -524,7 +552,8 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12|GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_4, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12|GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_15 
+                          |GPIO_PIN_4, GPIO_PIN_RESET);
 
   /*Configure GPIO pins : PA1 PA3 PA5 PA7 */
   GPIO_InitStruct.Pin = GPIO_PIN_1|GPIO_PIN_3|GPIO_PIN_5|GPIO_PIN_7;
@@ -532,8 +561,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PD12 PD13 PD14 PD4 */
-  GPIO_InitStruct.Pin = GPIO_PIN_12|GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_4;
+  /*Configure GPIO pins : PD12 PD13 PD14 PD15 
+                           PD4 */
+  GPIO_InitStruct.Pin = GPIO_PIN_12|GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_15 
+                          |GPIO_PIN_4;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
