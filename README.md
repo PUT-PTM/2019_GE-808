@@ -4,7 +4,7 @@
 Guitar stompboxes prices for **one** start from around 100PLN, now why would we spend so much money if we could use our **STM F407VG**? 
 The main goal concept of this project is to digitally modify a guitar signal and output it to audio jack.
 ### Description
-The guitar signal is sent through [this circuit](https://prnt.sc/nxadeb) to ADC pin->PC3.
+The guitar signal is sent through [this circuit](https://prnt.sc/nxadeb) to ADC pin->PC3.  
 Next step for our wave is ADC conversion, thanks to it we get signal in values from 0 to 4095 with our analog 0 roughly in the middle of digital range.
 The signal is carried in this fashion
 ```
