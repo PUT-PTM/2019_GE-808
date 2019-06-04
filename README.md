@@ -53,7 +53,7 @@ Simply import the project into [Eclipse System Workbench for STM32](http://www.o
 * Replacing LEDs for a Nokia or E-paper screen
 * Changing TL081 for more dedicated, sound-oriented op-amp 
 * Potentiometer effect parameters adjusting
-* Stacking more effects
+* Stacking **more** effects
 ### Attributions
 Schematics for modyfing guitar signal based on [this thread](https://www.diystompboxes.com/smfforum/index.php?topic=102931.0).
 Program uses I2S Audio Codec - CS43L22 functions acquired from [here](https://www.youtube.com/watch?v=QIPQOnVablY).
