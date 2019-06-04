@@ -38,12 +38,12 @@ Given you have the circuit and connected all the pins accordingly (based on __.i
 
 LEDs above the buttons indicate the effect currently working. Simply press the button to change currently used signal modification.
 ```
-| LED colour |    Effect     |
+| LED colour |   Effect       |
 -----------------------------
-|   WHITE   |   Clean        |
-|   RED     |   Distortion   |
-|   BLUE    |   Tremolo      |
-|   GREEN   |   Echo         |
+|   WHITE    |   Clean        |
+|   RED      |   Distortion   |
+|   BLUE     |   Tremolo      |
+|   GREEN    |   Echo         |
 ```
 ### How to compile
 Simply import the project into [Eclipse System Workbench for STM32](http://www.openstm32.org/System%2BWorkbench%2Bfor%2BSTM32) and use **compile** button or **Ctrl+F11** 
