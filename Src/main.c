@@ -283,12 +283,6 @@ int main(void)
 
   HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, 1);
 
-  //Jakieœ dzikie brzmienia ( sample na 1000)
-//  HAL_I2S_DeInit(&hi2s3);
-//  hi2s3.Init.AudioFreq = I2S_AUDIOFREQ_16K;
-//  HAL_I2S_Init(&hi2s3);
-
-
   /* USER CODE END 2 */
 
   /* Infinite loop */
