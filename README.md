@@ -58,6 +58,8 @@ Simply import the project into [Eclipse System Workbench for STM32](http://www.o
 Schematics for modyfing guitar signal based on [this thread](https://www.diystompboxes.com/smfforum/index.php?topic=102931.0).
 Program uses I2S Audio Codec - CS43L22 functions acquired from [here](https://www.youtube.com/watch?v=QIPQOnVablY).
 DMA connection based on [this video](https://www.youtube.com/watch?v=acJ_kSEU0V0).
+### Video presentation
+[![GE-808](http://i3.ytimg.com/vi/POmbcXsrwSA/hqdefault.jpg)](https://www.youtube.com/watch?v=POmbcXsrwSA&fbclid=IwAR18pQBxL3ic0lxkMVPvVbFuwZ_QTBU4YuO9PD7n7-qjOXUS4f-8-G-KZvI)
 ### Licence
 This project is created on MIT License.
 ### Credits
